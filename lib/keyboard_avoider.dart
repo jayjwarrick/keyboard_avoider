@@ -3,6 +3,8 @@ import 'dart:collection';
 import 'package:flutter/widgets.dart';
 import 'package:flutter/rendering.dart';
 
+const double _focusPaddingDefault = 12.0;
+
 /// Wraps the [child] in a [AnimatedContainer] that adjusts its bottom [padding] to accommodate the on-screen keyboard.
 /// Unlike a [Scaffold], it only insets by the actual amount obscured by the keyboard.
 /// If [autoScroll] is true and the [child] contains a focused widget such as a [TextField],
@@ -22,8 +24,9 @@ class KeyboardAvoider extends StatefulWidget {
   /// Could be expensive because it searches all the child objects in this widget's render tree.
   final bool autoScroll;
 
-  /// Space to put between the focused widget and the top of the keyboard. Defaults to 12.
-  /// Useful in case the focused widget is inside a parent widget that you also want to be visible.
+  /// Space to put between the focused widget and the top of the keyboard. Defaults to [_focusPaddingDefault].
+  /// Useful in case the focused widget is inside a parent widget that you also want to be visible, or
+  /// there is additional overlay besides they keyboard you need to account for.
   final double focusPadding;
 
   KeyboardAvoider({
@@ -32,7 +35,7 @@ class KeyboardAvoider extends StatefulWidget {
     this.duration = const Duration(milliseconds: 100),
     this.curve = Curves.easeOut,
     this.autoScroll = false,
-    this.focusPadding = 12.0,
+    this.focusPadding = _focusPaddingDefault,
   })  : assert(child is ScrollView ? child.controller != null : true),
         super(key: key);
 
@@ -44,6 +47,7 @@ class _KeyboardAvoiderState extends State<KeyboardAvoider> with WidgetsBindingOb
   Function(AnimationStatus) _animationListener;
   ScrollController _scrollController;
   double _overlap = 0.0;
+  double _previousOverlap = 0.0;
 
   @override
   void initState() {
@@ -60,6 +64,11 @@ class _KeyboardAvoiderState extends State<KeyboardAvoider> with WidgetsBindingOb
 
   @override
   Widget build(BuildContext context) {
+    // Check if resize is needed after each build, as the widget's [focusPadding] may have changed.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _resize();
+    });
+
     // Add a status listener to the animation after the initial build.
     // Wait a frame so that _animationKey.currentState is not null.
     if (_animationListener == null) {
@@ -103,6 +112,7 @@ class _KeyboardAvoiderState extends State<KeyboardAvoider> with WidgetsBindingOb
 
   /// WidgetsBindingObserver
 
+  /// TODO can we remove this, and rely on resize being called from build()?
   @override
   void didChangeMetrics() {
     //Need to wait a frame to get the new size
@@ -114,9 +124,13 @@ class _KeyboardAvoiderState extends State<KeyboardAvoider> with WidgetsBindingOb
   /// AnimationStatus
 
   void _animationStatusChanged(AnimationStatus status) {
+    debugPrint('_animationStatusChanged $status');
     if (status == AnimationStatus.completed) {
-      final keyboardVisible = MediaQuery.of(context).viewInsets.bottom > 0.0;
-      if (keyboardVisible) {
+//      final keyboardVisible = MediaQuery.of(context).viewInsets.bottom + widget.focusPadding !=
+//          _focusPaddingDefault;
+//      if (keyboardVisible) {
+      if (_previousOverlap < _overlap) {
+        // Keyboard is showing.
         _keyboardShown();
       }
     }
@@ -125,6 +139,7 @@ class _KeyboardAvoiderState extends State<KeyboardAvoider> with WidgetsBindingOb
   /// Private
 
   Widget _buildAnimatedContainer(Widget child) {
+    debugPrint('buildAnimatedContainer w $_overlap');
     return AnimatedContainer(
       key: _animationKey,
       padding: EdgeInsets.only(bottom: _overlap),
@@ -154,17 +169,19 @@ class _KeyboardAvoiderState extends State<KeyboardAvoider> with WidgetsBindingOb
     final mediaQuery = MediaQuery.of(context);
     final screenSize = mediaQuery.size;
     final screenInsets = mediaQuery.viewInsets;
-    final keyboardTop = screenSize.height - screenInsets.bottom;
+    final keyboardTop = screenSize.height - (screenInsets.bottom + widget.focusPadding);
 
     // If widget is entirely covered by keyboard, do nothing
-    if (widgetRect.top > keyboardTop) {
-      return;
-    }
+//    if (widgetRect.top > keyboardTop) {
+//      return;
+//    }
 
     // If widget is partially obscured by the keyboard, adjust bottom padding to fully expose it
     final overlap = max(0.0, widgetRect.bottom - keyboardTop);
     if (overlap != _overlap) {
       setState(() {
+        debugPrint('KeyboardAvoider UPDATE overlap $_overlap --> $overlap}');
+        _previousOverlap = _overlap;
         _overlap = overlap;
       });
     }
@@ -177,11 +194,11 @@ class _KeyboardAvoiderState extends State<KeyboardAvoider> with WidgetsBindingOb
     }
     // Need to wait a frame to get the new size
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _scrollToFocusedObject();
+      _scrollToFocusedObject(context);
     });
   }
 
-  void _scrollToFocusedObject() {
+  void _scrollToFocusedObject(BuildContext context) {
     if (context == null) {
       return;
     }
@@ -192,16 +209,18 @@ class _KeyboardAvoiderState extends State<KeyboardAvoider> with WidgetsBindingOb
     }
   }
 
-  /// Finds the first focused [RenderEditable] child of [root] using a breadth-first search.
+  /// Finds the first focused focused child of [root] using a breadth-first search.
   RenderObject _findFocusedObject(RenderObject root) {
     final q = Queue<RenderObject>();
     q.add(root);
     while (q.isNotEmpty) {
       final node = q.removeFirst();
-      if (node is RenderEditable && node.hasFocus) {
+      final config = SemanticsConfiguration();
+      node.describeSemanticsConfiguration(config);
+      if (config.isFocused) {
         return node;
       }
-      node.visitChildren((child) {
+      node.visitChildrenForSemantics((child) {
         q.add(child);
       });
     }
@@ -209,6 +228,7 @@ class _KeyboardAvoiderState extends State<KeyboardAvoider> with WidgetsBindingOb
   }
 
   /// If the focused object is covered by the keyboard, scroll to it.
+  ///
   /// Otherwise do nothing.
   _scrollToObject(RenderObject object) {
     // Calculate the offset needed to show the object in the [ScrollView]
