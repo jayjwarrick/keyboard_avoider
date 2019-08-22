@@ -2,37 +2,37 @@ import 'dart:math';
 import 'package:flutter/widgets.dart';
 import 'package:flutter/rendering.dart';
 
-import 'bottom_area_avoider.dart';
+import 'bottom_avoider.dart';
 
 /// A widget that re-sizes its [child] to avoid the system keyboard.
 ///
 /// Unlike a [Scaffold], it only insets by the actual amount obscured by the keyboard.
 ///
-/// Watches for media query changes via [didChangeMetrics], and adjusts a [BottomAreaAvoider] accordingly.
+/// Watches for media query changes via [didChangeMetrics], and adjusts a [BottomAvoider] accordingly.
 class KeyboardAvoider extends StatefulWidget {
 
-  /// See [BottomAreaAvoider.child]
+  /// See [BottomAvoider.child]
   final Widget child;
 
-  /// See [BottomAreaAvoider.duration]
+  /// See [BottomAvoider.duration]
   final Duration duration;
 
-  /// See [BottomAreaAvoider.curve]
+  /// See [BottomAvoider.curve]
   final Curve curve;
 
-  /// See [BottomAreaAvoider.autoScroll]
+  /// See [BottomAvoider.autoScroll]
   final bool autoScroll;
 
-  /// See [BottomAreaAvoider.overscroll]
+  /// See [BottomAvoider.overscroll]
   final double overscroll;
 
   KeyboardAvoider({
     Key key,
     @required this.child,
-    this.duration = BottomAreaAvoider.defaultDuration,
-    this.curve = BottomAreaAvoider.defaultCurve,
-    this.autoScroll = BottomAreaAvoider.defaultAutoScroll,
-    this.overscroll = BottomAreaAvoider.defaultOverscroll,
+    this.duration = BottomAvoider.defaultDuration,
+    this.curve = BottomAvoider.defaultCurve,
+    this.autoScroll = BottomAvoider.defaultAutoScroll,
+    this.overscroll = BottomAvoider.defaultOverscroll,
   })  : assert(child is ScrollView ? child.controller != null : true),
         super(key: key);
 
@@ -58,9 +58,9 @@ class _KeyboardAvoiderState extends State<KeyboardAvoider> with WidgetsBindingOb
 
   @override
   Widget build(BuildContext context) {
-    return BottomAreaAvoider(
+    return BottomAvoider(
       child: widget.child,
-      areaToAvoid: _keyboardOverlap,
+      bottomInset: _keyboardOverlap,
       autoScroll: widget.autoScroll,
       curve: widget.curve,
       duration: widget.duration,

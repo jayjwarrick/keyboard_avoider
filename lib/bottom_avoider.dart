@@ -2,13 +2,13 @@ import 'dart:collection';
 import 'package:flutter/widgets.dart';
 import 'package:flutter/rendering.dart';
 
-/// Helps [child] stay visible by resizing it to avoid the given [areaToAvoid].
+/// Helps [child] stay visible by resizing it to avoid the given [bottomInset].
 ///
 /// Wraps the [child] in a [AnimatedContainer] that adjusts its bottom [padding] to accommodate the given area.
 ///
 /// If [autoScroll] is true and the [child] contains a focused widget such as a [TextField],
 /// automatically scrolls so that it is just visible above the keyboard, plus any additional [overscroll].
-class BottomAreaAvoider extends StatefulWidget {
+class BottomAvoider extends StatefulWidget {
 
   static const Duration defaultDuration = Duration(milliseconds: 100);
   static const Curve defaultCurve = Curves.easeIn;
@@ -21,9 +21,9 @@ class BottomAreaAvoider extends StatefulWidget {
   /// If the [child] is a [ScrollView], it must have a [ScrollController].
   final Widget child;
 
-  /// Amount of bottom area to avoid. For example, the height of the currently-showing system keyboard, or
+  /// Amount of bottom area to inset [child] by. For example, the height of the currently-showing system keyboard, or
   /// any custom bottom overlays.
-  final double areaToAvoid;
+  final double bottomInset;
 
   /// Whether to auto-scroll to the focused widget after the keyboard appears. Defaults to false.
   /// Could be expensive because it searches all the child objects in this widget's render tree.
@@ -39,31 +39,31 @@ class BottomAreaAvoider extends StatefulWidget {
   /// Animation curve. Defaults to [defaultCurve]
   final Curve curve;
 
-  BottomAreaAvoider({
+  BottomAvoider({
     Key key,
     @required this.child,
-    @required this.areaToAvoid,
+    @required this.bottomInset,
     this.autoScroll = false,
     this.duration = defaultDuration,
     this.curve = defaultCurve,
     this.overscroll = defaultOverscroll,
   })  : assert(child is ScrollView ? child.controller != null : true),
-        assert(areaToAvoid >= 0, 'Cannot avoid a negative area'),
+        assert(bottomInset >= 0, 'Cannot avoid a negative area'),
         super(key: key);
 
-  BottomAreaAvoiderState createState() => BottomAreaAvoiderState();
+  BottomAvoiderState createState() => BottomAvoiderState();
 }
 
-class BottomAreaAvoiderState extends State<BottomAreaAvoider> {
+class BottomAvoiderState extends State<BottomAvoider> {
   final _animationKey = new GlobalKey<ImplicitlyAnimatedWidgetState>();
   Function(AnimationStatus) _animationListener;
   ScrollController _scrollController;
-  double _previousAreaToAvoid;
+  double _previousBottomInset;
 
   @override
-  void didUpdateWidget(BottomAreaAvoider oldWidget) {
-    _previousAreaToAvoid = oldWidget.areaToAvoid;
+  void didUpdateWidget(BottomAvoider oldWidget) {
     super.didUpdateWidget(oldWidget);
+    _previousBottomInset = oldWidget.bottomInset;
   }
 
   @override
@@ -116,7 +116,7 @@ class BottomAreaAvoiderState extends State<BottomAreaAvoider> {
   Widget _buildAnimatedContainer(Widget child) {
     return AnimatedContainer(
       key: _animationKey,
-      padding: EdgeInsets.only(bottom: widget.areaToAvoid),
+      padding: EdgeInsets.only(bottom: widget.bottomInset),
       duration: widget.duration,
       curve: widget.curve,
       child: child,
@@ -133,7 +133,7 @@ class BottomAreaAvoiderState extends State<BottomAreaAvoider> {
     if (!widget.autoScroll) {
       return; // auto scroll is not enabled, do nothing
     }
-    if (widget.areaToAvoid <= _previousAreaToAvoid) {
+    if (widget.bottomInset <= _previousBottomInset) {
       return; // decreased-- do nothing. We only scroll when area to avoid is added (keyboard shown).
     }
 
@@ -151,7 +151,7 @@ class BottomAreaAvoiderState extends State<BottomAreaAvoider> {
   }
 }
 
-/// Utility helper methods
+/// Public utility methods
 
 /// Finds the first focused focused child of [root] using a breadth-first search.
 RenderObject findFocusedObject(RenderObject root) {
